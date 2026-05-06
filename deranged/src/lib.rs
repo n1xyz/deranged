@@ -227,6 +227,12 @@ macro_rules! impl_ranged {
         )]
         #[repr(transparent)]
         #[derive(Clone, Copy, Eq, Ord, Hash)]
+        #[cfg_attr(feature = "zerocopy", derive(
+            zerocopy_derive::FromBytes,
+            zerocopy_derive::IntoBytes,
+            zerocopy_derive::Immutable,
+            zerocopy_derive::KnownLayout,
+        ))]
         pub struct $type<const MIN: $internal, const MAX: $internal>(
             Unsafe<$internal>,
         );
@@ -255,6 +261,12 @@ macro_rules! impl_ranged {
         #[doc = concat!("obtained with [`", stringify!($optional_type), "::get`].")]
         #[repr(transparent)]
         #[derive(Clone, Copy, Eq, Hash)]
+        #[cfg_attr(feature = "zerocopy", derive(
+            zerocopy_derive::FromBytes,
+            zerocopy_derive::IntoBytes,
+            zerocopy_derive::Immutable,
+            zerocopy_derive::KnownLayout,
+        ))]
         pub struct $optional_type<const MIN: $internal, const MAX: $internal>(
             $internal,
         );
