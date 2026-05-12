@@ -4,7 +4,15 @@
 #![no_std]
 #![doc(test(attr(deny(warnings))))]
 
-#[cfg(all(feature = "alloc", any(feature = "serde", feature = "quickcheck", feature = "sqlx09", feature = "schemars")))]
+#[cfg(all(
+    feature = "alloc",
+    any(
+        feature = "serde",
+        feature = "quickcheck",
+        feature = "sqlx09",
+        feature = "schemars"
+    )
+))]
 extern crate alloc;
 
 #[cfg(test)]
@@ -1623,6 +1631,56 @@ macro_rules! impl_ranged {
             {
                 const { assert!(MIN <= MAX); }
                 Ok(Self::Some($type::<MIN, MAX>::deserialize(deserializer)?))
+            }
+        }
+
+        #[cfg(feature = "borsh")]
+        impl<const MIN: $internal, const MAX: $internal> borsh::BorshSerialize for $type<MIN, MAX> {
+            #[inline(always)]
+            fn serialize<W: borsh::io::Write>(&self, writer: &mut W) -> borsh::io::Result<()> {
+                const { assert!(MIN <= MAX); }
+                self.get().serialize(writer)
+            }
+        }
+
+        #[cfg(feature = "borsh")]
+        impl<const MIN: $internal, const MAX: $internal> borsh::BorshSerialize
+            for $optional_type<MIN, MAX>
+        {
+            #[inline(always)]
+            fn serialize<W: borsh::io::Write>(&self, writer: &mut W) -> borsh::io::Result<()> {
+                const { assert!(MIN <= MAX); }
+                self.inner().serialize(writer)
+            }
+        }
+
+        #[cfg(feature = "borsh")]
+        impl<const MIN: $internal, const MAX: $internal> borsh::BorshDeserialize
+            for $type<MIN, MAX>
+        {
+            #[inline]
+            fn deserialize_reader<R: borsh::io::Read>(reader: &mut R) -> borsh::io::Result<Self> {
+                const { assert!(MIN <= MAX); }
+                let internal = <$internal>::deserialize_reader(reader)?;
+                Self::new(internal).ok_or_else(|| borsh::io::ErrorKind::InvalidData.into())
+            }
+        }
+
+        #[cfg(feature = "borsh")]
+        impl<const MIN: $internal, const MAX: $internal> borsh::BorshDeserialize
+            for $optional_type<MIN, MAX>
+        {
+            #[inline]
+            fn deserialize_reader<R: borsh::io::Read>(reader: &mut R) -> borsh::io::Result<Self> {
+                const { assert!(MIN <= MAX); }
+                let internal = <$internal>::deserialize_reader(reader)?;
+                if internal == Self::NICHE {
+                    Ok(Self::None)
+                } else {
+                    $type::new(internal)
+                        .map(Self::Some)
+                        .ok_or_else(|| borsh::io::ErrorKind::InvalidData.into())
+                }
             }
         }
 
