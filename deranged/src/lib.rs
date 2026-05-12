@@ -4,7 +4,7 @@
 #![no_std]
 #![doc(test(attr(deny(warnings))))]
 
-#[cfg(all(feature = "alloc", any(feature = "serde", feature = "quickcheck")))]
+#[cfg(all(feature = "alloc", any(feature = "serde", feature = "quickcheck", feature = "sqlx09")))]
 extern crate alloc;
 
 #[cfg(test)]
@@ -207,6 +207,7 @@ macro_rules! impl_ranged {
             optional: $optional_type:ident
             optional_alias: $optional_alias:ident
             from: [$($from:ident($from_internal:ident))+]
+            $(sqlx: $sql_int:ident)?
             $(manual: [$($skips:ident)+])?
         }
     )*) => {$(
@@ -1625,6 +1626,88 @@ macro_rules! impl_ranged {
             }
         }
 
+        $(
+        #[cfg(feature = "sqlx09")]
+        impl<const MIN: $internal, const MAX: $internal> sqlx09::Type<sqlx09::Postgres>
+            for $type<MIN, MAX>
+        {
+            #[inline]
+            fn type_info() -> sqlx09::postgres::PgTypeInfo {
+                <$sql_int as sqlx09::Type<sqlx09::Postgres>>::type_info()
+            }
+        }
+
+        #[cfg(feature = "sqlx09")]
+        impl<const MIN: $internal, const MAX: $internal> sqlx09::postgres::PgHasArrayType
+            for $type<MIN, MAX>
+        {
+            #[inline]
+            fn array_type_info() -> sqlx09::postgres::PgTypeInfo {
+                <$sql_int as sqlx09::postgres::PgHasArrayType>::array_type_info()
+            }
+        }
+
+        #[cfg(feature = "sqlx09")]
+        impl<const MIN: $internal, const MAX: $internal>
+            sqlx09::Encode<'_, sqlx09::Postgres> for $type<MIN, MAX>
+        {
+            #[inline]
+            fn encode_by_ref(
+                &self,
+                buf: &mut <sqlx09::Postgres as sqlx09::Database>::ArgumentBuffer,
+            ) -> Result<
+                sqlx09::encode::IsNull,
+                alloc::boxed::Box<dyn core::error::Error + 'static + Send + Sync>,
+            > {
+                const { assert!(MIN <= MAX); }
+                // ideally we'd conditionally implement sqlx enc/dec based on
+                // range, but this is impossible so we panic at runtime instead.
+                assert!(
+                    MIN as i128 >= <$sql_int>::MIN as i128,
+                    concat!(stringify!($type), " minimum does not fit SQL storage type"),
+                );
+                assert!(
+                    MAX as i128 <= <$sql_int>::MAX as i128,
+                    concat!(stringify!($type), " maximum does not fit SQL storage type"),
+                );
+
+                let value: $sql_int = self
+                    .get()
+                    .try_into()
+                    .expect(concat!(stringify!($type), " value does not fit SQL storage type"));
+
+                <$sql_int as sqlx09::Encode<sqlx09::Postgres>>::encode_by_ref(&value, buf)
+            }
+        }
+
+        #[cfg(feature = "sqlx09")]
+        impl<'r, const MIN: $internal, const MAX: $internal>
+            sqlx09::Decode<'r, sqlx09::Postgres> for $type<MIN, MAX>
+        {
+            #[inline]
+            fn decode(
+                value: <sqlx09::Postgres as sqlx09::Database>::ValueRef<'r>,
+            ) -> Result<Self, alloc::boxed::Box<dyn core::error::Error + 'static + Send + Sync>> {
+                const { assert!(MIN <= MAX); }
+                // ideally we'd conditionally implement sqlx enc/dec based on
+                // range, but this is impossible so we panic at runtime instead.
+                assert!(
+                    MIN as i128 >= <$sql_int>::MIN as i128,
+                    concat!(stringify!($type), " minimum does not fit SQL storage type"),
+                );
+                assert!(
+                    MAX as i128 <= <$sql_int>::MAX as i128,
+                    concat!(stringify!($type), " maximum does not fit SQL storage type"),
+                );
+
+                let value = <$sql_int as sqlx09::Decode<sqlx09::Postgres>>::decode(value)?;
+                let value: $internal = value.try_into().map_err(|_| TryFromIntError)?;
+
+                Self::new(value).ok_or(TryFromIntError).map_err(Into::into)
+            }
+        }
+        )?
+
         #[cfg(feature = "rand08")]
         impl<
             const MIN: $internal,
@@ -1793,6 +1876,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i16
     }
     RangedU16 {
         mod_name: ranged_u16
@@ -1815,6 +1899,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i16
     }
     RangedU32 {
         mod_name: ranged_u32
@@ -1837,6 +1922,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i32
     }
     RangedU64 {
         mod_name: ranged_u64
@@ -1859,6 +1945,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i64
     }
     RangedU128 {
         mod_name: ranged_u128
@@ -1926,6 +2013,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i16
     }
     RangedI16 {
         mod_name: ranged_i16
@@ -1948,6 +2036,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i16
     }
     RangedI32 {
         mod_name: ranged_i32
@@ -1970,6 +2059,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i32
     }
     RangedI64 {
         mod_name: ranged_i64
@@ -1992,6 +2082,7 @@ impl_ranged! {
             RangedI128(i128)
             RangedIsize(isize)
         ]
+        sqlx: i64
     }
     RangedI128 {
         mod_name: ranged_i128
