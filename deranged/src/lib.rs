@@ -4,7 +4,7 @@
 #![no_std]
 #![doc(test(attr(deny(warnings))))]
 
-#[cfg(all(feature = "alloc", any(feature = "serde", feature = "quickcheck", feature = "sqlx09")))]
+#[cfg(all(feature = "alloc", any(feature = "serde", feature = "quickcheck", feature = "sqlx09", feature = "schemars")))]
 extern crate alloc;
 
 #[cfg(test)]
@@ -1623,6 +1623,31 @@ macro_rules! impl_ranged {
             {
                 const { assert!(MIN <= MAX); }
                 Ok(Self::Some($type::<MIN, MAX>::deserialize(deserializer)?))
+            }
+        }
+
+        #[cfg(feature = "schemars")]
+        impl<
+            const MIN: $internal,
+            const MAX: $internal,
+        > schemars::JsonSchema for $type<MIN, MAX> {
+            fn inline_schema() -> bool {
+                // avoid aliasing all $defs due to same schema name
+                true
+            }
+
+            fn schema_name() -> alloc::borrow::Cow<'static, str> {
+                alloc::borrow::Cow::Borrowed(stringify!($type))
+            }
+
+            fn json_schema(
+                _generator: &mut schemars::SchemaGenerator
+            ) -> schemars::Schema {
+                schemars::json_schema!({
+                    "type": "integer",
+                    "minimum": MIN,
+                    "maximum": MAX,
+                })
             }
         }
 
