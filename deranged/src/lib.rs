@@ -2214,6 +2214,57 @@ impl_ranged! {
     }
 }
 
+#[cfg(feature = "sqlx09")]
+impl<const MIN: u128, const MAX: u128> sqlx09::Type<sqlx09::Postgres> for RangedU128<MIN, MAX> {
+    #[inline]
+    fn type_info() -> sqlx09::postgres::PgTypeInfo {
+        <sqlx09::types::BigDecimal as sqlx09::Type<sqlx09::Postgres>>::type_info()
+    }
+}
+
+#[cfg(feature = "sqlx09")]
+impl<const MIN: u128, const MAX: u128> sqlx09::postgres::PgHasArrayType for RangedU128<MIN, MAX> {
+    #[inline]
+    fn array_type_info() -> sqlx09::postgres::PgTypeInfo {
+        <sqlx09::types::BigDecimal as sqlx09::postgres::PgHasArrayType>::array_type_info()
+    }
+}
+
+#[cfg(feature = "sqlx09")]
+impl<const MIN: u128, const MAX: u128> sqlx09::Encode<'_, sqlx09::Postgres>
+    for RangedU128<MIN, MAX>
+{
+    #[inline]
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx09::Postgres as sqlx09::Database>::ArgumentBuffer,
+    ) -> Result<sqlx09::encode::IsNull, alloc::boxed::Box<dyn Error + 'static + Send + Sync>> {
+        let value = sqlx09::types::BigDecimal::from(self.get());
+        <sqlx09::types::BigDecimal as sqlx09::Encode<sqlx09::Postgres>>::encode_by_ref(&value, buf)
+    }
+}
+
+#[cfg(feature = "sqlx09")]
+impl<'r, const MIN: u128, const MAX: u128> sqlx09::Decode<'r, sqlx09::Postgres>
+    for RangedU128<MIN, MAX>
+{
+    #[inline]
+    fn decode(
+        value: <sqlx09::Postgres as sqlx09::Database>::ValueRef<'r>,
+    ) -> Result<Self, alloc::boxed::Box<dyn Error + 'static + Send + Sync>> {
+        let value = <sqlx09::types::BigDecimal as sqlx09::Decode<sqlx09::Postgres>>::decode(value)?;
+
+        if !value.is_integer() {
+            return Err(TryFromIntError.into());
+        }
+
+        use num_traits::ToPrimitive as _;
+        let value = value.to_u128().ok_or(TryFromIntError)?;
+
+        Ok(Self::new(value).ok_or(TryFromIntError)?)
+    }
+}
+
 #[cfg(feature = "rand09")]
 impl<const MIN: usize, const MAX: usize> rand09::distr::Distribution<RangedUsize<MIN, MAX>>
     for rand09::distr::StandardUniform
