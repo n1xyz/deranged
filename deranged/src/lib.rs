@@ -1701,11 +1701,19 @@ macro_rules! impl_ranged {
             fn json_schema(
                 _generator: &mut schemars::SchemaGenerator
             ) -> schemars::Schema {
-                schemars::json_schema!({
+                let mut schema = schemars::json_schema!({
                     "type": "integer",
-                    "minimum": MIN,
-                    "maximum": MAX,
-                })
+                });
+
+                if let Ok(minimum) = schemars::_private::serde_json::to_value(MIN) {
+                    schema.insert("minimum".into(), minimum);
+                }
+
+                if let Ok(maximum) = schemars::_private::serde_json::to_value(MAX) {
+                    schema.insert("maximum".into(), maximum);
+                }
+
+                schema
             }
         }
 
